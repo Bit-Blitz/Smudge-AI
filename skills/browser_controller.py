@@ -154,7 +154,7 @@ class BrowserController:
         If target is a phone number (digits), uses direct link.
         If target is a name, searches for the contact.
         """
-        logger.info(f"Sending WhatsApp message to {target}")
+        logger.info(f"Sending WhatsApp message to {target} via Web")
         try:
             # Check if target is a phone number (mostly digits)
             clean_phone = "".join(filter(str.isdigit, str(target)))
@@ -162,68 +162,39 @@ class BrowserController:
             
             encoded_message = urllib.parse.quote(message)
             
-            if is_phone_number and any(c.isdigit() for c in str(target)):
+            if is_phone_number:
                 # Use Direct Link API for phone numbers
                 url = f"https://web.whatsapp.com/send?phone={clean_phone}&text={encoded_message}"
-                return self.open_url(url)
+                self.open_url(url)
+                
+                # Wait for page load and send button
+                time.sleep(15)
+                
+                # Press Enter to send (the text is already pre-filled by the URL)
+                import pyautogui
+                pyautogui.press('enter')
+                return True
             else:
                 # Use Search Link for saved contact names
-                # Note: WhatsApp Web doesn't have a direct URL for searching contact names that is publicly documented in the same way,
-                # but we can open the main page. The agent will then need to click and type.
-                # HOWEVER, a better URL hack for "search" isn't standard.
-                # Strategy: Open WhatsApp Web, then the agent's next steps (Executor) must handle the UI interaction.
-                # BUT, to make it "work" as a single action, we can't fully automate the search without UI automation steps.
-                # Let's try to set the clipboard or return a status that tells the agent to proceed with UI automation.
-                
-                # Actually, there isn't a ?text= param that works without a phone number.
-                # So we open WhatsApp Web, and the Planner needs to know to follow up with "click search, type name, enter".
-                
-                # For now, let's open WhatsApp Web.
-                # A better approach: The Executor should handle this distinction.
-                # If we return True here, we just opened the page.
-                
-                # Let's use a specialized strategy in the executor for "contact_name".
-                # But to answer the user's question: "would it work" -> No, not with the current code.
-                # I need to implement a "search_contact" flow.
-                
-                # Since this is a browser controller, let's just open the main page
-                # and relying on the executor/planner to do the "type name" part is one way.
-                # OR we can try to inject JS? No, simple is better.
-                
                 logger.info(f"Target '{target}' appears to be a name. Opening WhatsApp Web main page.")
                 self.open_url("https://web.whatsapp.com/")
                 
-                # We need to wait for load, then type the name.
-                # Since BrowserController is just "open url", we might need to extend it or let the Executor handle the typing.
-                # The Executor has 'type_text' and 'press_key'.
-                
-                # Let's return a special signal or handle it in Executor?
-                # Actually, the best way is to return True (opened) and let the Planner generate the next steps?
-                # But the user wants "send message to 'Saved Contact'" to just work.
-                
-                # I will add a small delay and then try to type the name if possible, 
-                # but BrowserController usually just opens URLs.
-                # Let's import pyautogui here for a "smart" controller action?
                 import pyautogui
                 
-                # Wait for WhatsApp Web to load (it can be slow)
-                # 10 seconds might be too short for some connections, let's bump to 15
+                # Wait for WhatsApp Web to load
                 time.sleep(15) 
                 
-                # Focus the search box (Ctrl + Alt + / is the shortcut, or Tab navigation)
-                # Standard WhatsApp Web shortcut for search: Ctrl + Alt + /
-                # Sometimes just pressing Tab multiple times works better if shortcuts fail
-                # But let's try the shortcut first.
+                # Focus the search box (Ctrl + Alt + / is the shortcut)
                 pyautogui.hotkey('ctrl', 'alt', '/')
-                time.sleep(2) # Wait for focus
+                time.sleep(2) 
                 
                 # Type the name
                 pyautogui.write(target)
-                time.sleep(3) # Wait for search results to populate
+                time.sleep(3) # Wait for search results
                 
-                # Select contact (Enter usually selects the first result)
+                # Select contact
                 pyautogui.press('enter') 
-                time.sleep(2) # Wait for chat to open
+                time.sleep(2) 
                 
                 # Type message
                 pyautogui.write(message)
@@ -231,6 +202,10 @@ class BrowserController:
                 pyautogui.press('enter') # Send
                 
                 return True
+
+        except Exception as e:
+            logger.error(f"Failed to send WhatsApp message via Web: {e}")
+            return False
 
         except Exception as e:
             logger.error(f"Failed to send WhatsApp message: {e}")

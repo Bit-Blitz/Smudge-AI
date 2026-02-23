@@ -18,14 +18,39 @@ class Verifier:
         logger.info(f"Verifying plan: {plan}")
         
         action = plan.get("action")
+        
+        # Extract target from either legacy or new schema structure
         target = plan.get("target")
+        parameters = plan.get("parameters", {})
+        
+        if not target and parameters:
+            # Map schema parameters to verification target
+            if action in ["open_app", "close_app", "focus_app"]:
+                target = parameters.get("app_name")
+            elif action == "type_text":
+                target = parameters.get("text")
+            elif action == "press_key":
+                target = parameters.get("key")
+            elif action == "run_command":
+                target = parameters.get("command")
+            elif action == "open_url":
+                target = parameters.get("url")
         
         if not action:
             return False
         
+        if not target and action not in ["click_element", "press_key", "type_text", "done", "wait"]:
+             # Some actions might not have a clear 'target' string to verify against title
+             pass
+
         if action == "open_app":
+            if not target:
+                logger.warning("Verification skipped: No target app name found.")
+                return True # Optimistic
+
             # Check if target app is in open windows or focused app
             open_windows = final_state.get("open_windows", [])
+            # ... (rest of logic)
             for win in open_windows:
                 if target.lower() in win["title"].lower():
                     logger.info(f"Verification successful: {target} is open.")

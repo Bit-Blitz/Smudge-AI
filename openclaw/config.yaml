@@ -15,7 +15,7 @@ llm:
     verifier_model: "llama-3.1-8b-instant"
   gemini:
     api_key: "${GEMINI_API_KEY}"
-    vision_model: "gemini-3.0" # Using available model, PRD said 2.5 but 2.0-flash is current fast standard or 1.5-pro
+    vision_model: "gemini-3.0" 
 
 system:
   log_level: "INFO"

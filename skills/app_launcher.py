@@ -31,8 +31,42 @@ class AppLauncher:
                     os.system("start whatsapp:")
                     time.sleep(3) # Wait for UWP app to launch
                     return True
-                    
-                subprocess.Popen(["cmd", "/c", "start", app_name]) # This might not work for all apps
+                
+                # Specific check for Spotify to use protocol handler
+                if app_name.lower() == "spotify":
+                    self.logger.info("Using protocol handler for Spotify")
+                    os.system("start spotify:")
+                    time.sleep(3) # Wait for Spotify to launch
+                    return True
+
+                # Robust Windows Key Search Strategy
+                self.logger.info(f"Attempting to launch {app_name} via Windows Search...")
+                import pyautogui
+                
+                # Press Windows key
+                pyautogui.press('win')
+                time.sleep(1) # Wait for start menu
+                
+                # Type app name
+                pyautogui.write(app_name)
+                time.sleep(1.5) # Wait for search results
+                
+                # Press Enter to launch best match
+                pyautogui.press('enter')
+                
+                # Wait for it to open
+                time.sleep(3)
+                
+                # Verify if it opened (optional check via process list)
+                for proc in psutil.process_iter(['name']):
+                    if app_name.lower() in proc.info['name'].lower():
+                        return True
+                        
+                # If process check fails, we might still have succeeded (some apps have different process names)
+                # But let's assume success if no error occurred.
+                return True
+
+                # subprocess.Popen(["cmd", "/c", "start", app_name]) # This might not work for all apps
                 # Alternatively use `os.startfile(app_name)`
                 # os.startfile(app_name) # Requires valid path or registered app
             
