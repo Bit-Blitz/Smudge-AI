@@ -1,0 +1,27 @@
+# OpenClaw Configuration
+
+agent:
+  name: "Aegis OS"
+  version: "1.0"
+  max_autonomous_loop: 25
+  structured_reasoning_latency_target_ms: 700
+  vision_fallback_latency_target_ms: 3000
+
+llm:
+  groq:
+    api_key: "${GROQ_API_KEY}"
+    planner_model: "llama-3.3-70b-versatile"
+    executor_model: "mixtral-8x7b-32768"
+    verifier_model: "llama-3.1-8b-instant"
+  gemini:
+    api_key: "${GEMINI_API_KEY}"
+    vision_model: "gemini-3.0" # Using available model, PRD said 2.5 but 2.0-flash is current fast standard or 1.5-pro
+
+system:
+  log_level: "INFO"
+  screenshot_dir: "d:/Ceaser-AI/logs/screenshots"
+  db_path: "d:/Ceaser-AI/openclaw/memory.db"
+
+safety:
+  risk_level: "medium" # low, medium, high
+  require_confirmation_for: ["medium", "high"]

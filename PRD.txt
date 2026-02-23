@@ -1,0 +1,515 @@
+PRODUCT REQUIREMENTS DOCUMENT (PRD)
+
+Product Name:
+Aegis OS – Structured-First Autonomous Desktop Agent
+
+Version:
+1.0
+
+EXECUTIVE SUMMARY
+
+Aegis OS is a general-purpose autonomous desktop agent built on top of OpenClaw as its persistent runtime kernel.
+
+The system follows a Structured-First → Vision-Fallback architecture:
+
+Structured OS perception using Windows APIs and browser DOM extraction
+
+Logical reasoning using Groq-hosted LLMs
+
+Deterministic execution via skill tools
+
+Vision-based fallback using Gemini 2.5 Computer Use only when structured perception fails
+
+Primary reasoning is powered by Groq.
+Fallback visual reasoning is powered by Google Gemini 2.5 Computer Use.
+Agent orchestration and lifecycle management are handled by OpenClaw.
+
+Core Goal:
+Minimize user friction by autonomously navigating and controlling the OS safely and efficiently.
+
+CORE DESIGN PRINCIPLES
+
+Prefer semantic control over visual inference.
+
+Use deterministic APIs before UI simulation.
+
+Use structured reasoning before multimodal reasoning.
+
+Always verify actions after execution.
+
+Enforce safety before execution of destructive operations.
+
+Maintain persistent memory of user preferences and failures.
+
+SYSTEM ARCHITECTURE OVERVIEW
+
+High-Level Flow:
+
+User Goal
+->
+OpenClaw Runtime Kernel
+->
+Structured Perception Skill
+->
+Groq Reasoning Skill
+->
+Execution Skills
+->
+Verification Skill
+->
+Fallback Router (Gemini Vision if needed)
+->
+Memory Update
+
+OpenClaw acts as:
+
+Persistent daemon
+
+Skill registry
+
+Permission gateway
+
+Memory manager
+
+Orchestration engine
+
+Heartbeat scheduler
+
+COMPONENTS
+
+4.1 OpenClaw Runtime Layer
+
+OpenClaw is the always-on agent kernel.
+
+Responsibilities:
+
+Runs in background as daemon
+
+Loads and registers skills dynamically
+
+Stores API keys securely (Groq + Gemini)
+
+Injects memory into prompts
+
+Handles permission gating
+
+Logs all actions
+
+Executes heartbeat cycles
+
+Maintains retry and fallback logic
+
+OpenClaw is the control plane of Aegis OS.
+
+4.2 Structured Perception Engine (Primary Mode)
+
+Purpose:
+Convert current OS state into structured JSON.
+
+Sources:
+
+Windows UI Automation API
+
+win32gui
+
+pywinauto
+
+psutil (process listing)
+
+Chrome DevTools Protocol (DOM extraction)
+
+Filesystem scanning (os module)
+
+Output Format Example:
+
+{
+system: {
+os: "Windows 11",
+time: "18:43",
+focused_app: "Desktop"
+},
+open_windows: [
+{
+title: "File Explorer",
+process: "explorer.exe",
+controls: [
+{ type: "button", label: "New" },
+{ type: "list", items: ["Downloads", "Documents"] }
+]
+}
+],
+taskbar_apps: ["Chrome", "VS Code", "Telegram"],
+installed_apps: ["Chrome", "VS Code", "WhatsApp"]
+}
+
+This JSON becomes the “perceived world” for reasoning.
+
+No screenshots are used in primary mode.
+
+4.3 Groq Reasoning Engine (Primary Brain)
+
+Hosted on Groq.
+
+Models Used:
+
+Strategic Planning:
+llama-3.3-70b-versatile
+
+Structured Action Output:
+mixtral-8x7b-32768
+
+Quick Verification / Lightweight Checks:
+llama-3.1-8b-instant
+
+Prompt Structure:
+
+GOAL:
+<user goal>
+
+UI_STATE:
+<structured JSON>
+
+INSTRUCTIONS:
+Return next action in structured JSON format.
+
+Expected Output:
+
+{
+action: "open_app",
+target: "Chrome",
+strategy: "windows_search"
+}
+
+Groq is never given raw screenshots.
+It reasons purely on structured data.
+
+4.4 Execution Engine (OpenClaw Skills)
+
+Execution is modularized as skills.
+
+Categories:
+
+App Control:
+
+open_app
+
+close_app
+
+focus_app
+
+Keyboard:
+
+press_key
+
+type_text
+
+Mouse:
+
+click_element
+
+drag
+
+Filesystem:
+
+create_file
+
+move_file
+
+delete_file
+
+sort_files
+
+Browser:
+
+navigate_url
+
+extract_text
+
+extract_table
+
+System:
+
+run_command
+
+check_logs
+
+Execution Rules:
+
+Validate JSON schema before execution
+
+Validate risk level
+
+Log action
+
+Execute
+
+Trigger verification
+
+4.5 Verification Layer
+
+After every action:
+
+Re-run structured perception
+
+Compare expected state vs actual state
+
+Assign confidence score
+
+Example:
+If action = open_app Chrome
+Verification:
+Check if any open window contains "Chrome"
+
+If verification fails:
+Retry (max 2 attempts)
+Then escalate to fallback router
+
+4.6 Vision Fallback Engine
+
+Used only when structured mode fails.
+
+Triggers:
+
+Structured extraction returns incomplete tree
+
+Groq returns INSUFFICIENT_CONTEXT
+
+Verification fails repeatedly
+
+Element exists visually but not in accessibility tree
+
+Spatial reasoning required
+
+Vision is handled by Google Gemini 2.5 Computer Use.
+
+Vision Flow:
+
+Capture screenshot
+
+Send goal + screenshot to Gemini
+
+Receive action
+
+Execute action
+
+Return to structured mode
+
+Vision is recovery mode, not primary control.
+
+APPLICATION LAUNCH STRATEGY
+
+Example: Open Chrome
+
+Decision Logic:
+
+If Chrome window already open -> focus
+
+Else -> Windows Search strategy
+
+Press Win
+
+Type "Chrome"
+
+Press Enter
+
+Verify Chrome window appears
+
+If fail -> direct execution (subprocess)
+
+If still fail -> vision fallback
+
+This avoids hardcoded paths when possible.
+
+CONFIDENCE ROUTING SYSTEM
+
+Each cycle produces:
+
+{
+structured_confidence: 0.91,
+retries: 0,
+fallback_used: false
+}
+
+Switch to vision if:
+
+structured_confidence < 0.7
+
+2 consecutive failures
+
+Missing control labels
+
+Layout-based reasoning required
+
+MEMORY SYSTEM
+
+SQLite database maintained by OpenClaw.
+
+Tables:
+
+user_preferences
+frequent_apps
+cached_app_paths
+action_history
+failure_patterns
+ui_snapshots_metadata
+
+Purpose:
+
+Improve routing decisions
+
+Reduce retries
+
+Learn preferred workflows
+
+Cache app locations
+
+SAFETY & GOVERNANCE
+
+Risk Levels:
+
+Low:
+Open app, navigate browser
+
+Medium:
+Delete Downloads, move large files
+
+High:
+Delete system files, modify registry
+
+Rules:
+
+Medium actions require user confirmation
+
+High actions are blocked
+
+Financial transactions require explicit approval
+
+Always verify destructive actions
+
+All actions are logged.
+
+NON-FUNCTIONAL REQUIREMENTS
+
+Structured reasoning latency:
+< 700 ms
+
+Vision fallback latency:
+< 3 seconds
+
+Max autonomous loop:
+25 steps
+
+Retry limit per action:
+2
+
+Full logging required.
+
+SUCCESS METRICS
+
+85% tasks completed without vision
+
+< 5% fatal failure rate
+
+Average retries < 2
+
+60% reduction in token cost vs vision-first architecture
+
+FUTURE EXTENSIONS
+
+Multi-agent role separation (Planner, Executor, Verifier)
+
+Cross-platform support
+
+Voice interface
+
+Cloud-hosted orchestration
+
+Proactive monitoring mode
+
+PROJECT FILE STRUCTURE
+
+Below is the recommended project structure.
+
+aegis-os/
+README.txt
+PRD.txt
+requirements.txt
+main.py
+
+openclaw/
+SOUL.md
+config.yaml
+memory.db
+
+router.py
+permission_engine.py
+confidence_router.py
+
+skills/
+  structured_perception.py
+  groq_planner.py
+  executor.py
+  verifier.py
+  app_launcher.py
+  filesystem_manager.py
+  browser_controller.py
+  system_monitor.py
+  vision_fallback.py
+
+prompts/
+  planner_prompt.txt
+  verifier_prompt.txt
+
+core/
+ui_extractor.py
+window_manager.py
+dom_extractor.py
+app_registry.py
+
+utils/
+logger.py
+json_validator.py
+retry_handler.py
+
+tests/
+test_structured_mode.py
+test_vision_fallback.py
+test_app_launch.py
+
+FILE ROLE EXPLANATION
+
+main.py
+Entry point. Sends goal to OpenClaw runtime.
+
+openclaw/router.py
+Routes between structured mode and vision fallback.
+
+structured_perception.py
+Extracts UI state JSON.
+
+groq_planner.py
+Calls Groq API and enforces structured JSON output.
+
+executor.py
+Executes validated actions.
+
+verifier.py
+Confirms expected state changes.
+
+confidence_router.py
+Determines whether to escalate to vision.
+
+vision_fallback.py
+Calls Gemini 2.5 Computer Use.
+
+SOUL.md
+Defines agent personality, constraints, and long-term directives.
+
+FINAL POSITIONING STATEMENT
+
+Aegis OS is not a macro system.
+
+It is a structured cognitive operating layer built on OpenClaw, powered primarily by Groq reasoning, and escalated to Gemini Computer Use only when structured perception is insufficient.
+
+It minimizes cost, maximizes determinism, and preserves safety through hierarchical control.
+
